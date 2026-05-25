@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo Game Hub</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Arial',sans-serif;}
+  body{background:#0f0f1a;color:#fff;display:flex;flex-direction:column;min-height:100vh;}
+  .container{max-width:600px;margin:auto;padding:20px;flex:1;}
+  .card{background:#1c1c2e;padding:25px;border-radius:12px;box-shadow:0 0 20px rgba(0,255,150,0.2);}
+  h2{text-align:center;margin-bottom:20px;color:#00ff96;}
+  input,button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-size:16px;}
+  input{background:#2a2a40;color:#fff;}
+  button{background:#00ff96;color:#000;font-weight:bold;cursor:pointer;}
+  button:hover{opacity:0.9;}
+  .hidden{display:none;}
+  .tabs{display:flex;gap:10px;margin-bottom:15px;}
+  .tab{flex:1;text-align:center;padding:10px;background:#2a2a40;border-radius:8px;cursor:pointer;}
+  .tab.active{background:#00ff96;color:#000;}
+  .coins{font-size:28px;color:#ffd700;margin:15px 0;}
+  .otp-box{display:flex;gap:8px;justify-content:center;margin:20px 0;}
+  .otp-box input{width:50px;text-align:center;font-size:24px;}
+  .notice{color:#ffcc00; text-align:center; margin:10px 0;}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Auth Section -->
+  <div id="auth" class="card">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('register')">Register</div>
+      <div class="tab" onclick="switchTab('login')">Login</div>
+    </div>
+
+    <!-- Register -->
+    <div id="register">
+      <h2>Account Register</h2>
+      <input type="tel" id="regPhone" placeholder="Phone number +880XXXXXXXXXX">
+      <input type="password" id="regPass" placeholder="Create password (min 8 chars)">
+      <button onclick="startRegister()">Register</button>
+    </div>
+
+    <!-- OTP Verification -->
+    <div id="otpScreen" class="hidden">
+      <h2>OTP Verification</h2>
+      <p style="text-align:center;margin:15px 0;">আমরা আপনার নাম্বারে 6 ডিজিট কোড পাঠিয়েছি</p>
+      <div class="otp-box" id="otpInputs"></div>
+      <button onclick="verifyOTP()">Verify OTP</button>
+      <button onclick="backToRegister()" style="background:#555;color:#fff;margin-top:10px;">Back</button>
+    </div>
+
+    <!-- Login -->
+    <div id="login" class="hidden">
+      <h2>Login</h2>
+      <input type="tel" id="loginPhone" placeholder="Phone number">
+      <input type="password" id="loginPass" placeholder="Password">
+      <button onclick="loginUser()">Login</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="card hidden">
+    <h2>Welcome, <span id="username"></span></h2>
+    <div class="coins">Coins: <span id="coinBalance">1000</span></div>
+    <!-- আগের গেমগুলো এখানে পরে যোগ করা যাবে -->
+    <button onclick="logout()" style="background:#555;color:#fff;margin-top:20px;">Logout</button>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:15px;font-size:13px;color:#aaa;">
+  This game is for entertainment purposes only. No real money involved.
+</footer>
+
+<script>
+// ================== BACKEND URL ==================
+// Render এ deploy করার পর এখানে তোমার অ্যাপের লিংক বসাবে
+const API_URL = 'https://your-app-name.onrender.com'; 
+
+let currentPhone = '';
+let users = JSON.parse(localStorage.getItem('users') || '{}');
+let currentUser = null;
+
+function switchTab(tab) {
+  document.getElementById('register').classList.add('hidden');
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('otpScreen').classList.add('hidden');
+  document.getElementById(tab).classList.remove('hidden');
+}
+
+async function startRegister() {
+  const phone = document.getElementById('regPhone').value.trim();
+  const pass = document.getElementById('regPass').value;
+
+  if (!phone || pass.length < 8) {
+    alert("Valid phone number এবং minimum 8 character password দিন");
+    return;
+  }
+
+  currentPhone = phone;
+
+  try {
+    const res = await fetch(`${API_URL}/register`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phone, password: pass})
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showOTPScreen();
+    } else {
+      alert(data.message);
+    }
+  } catch(e) {
+    alert("Server এ সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।");
+  }
+}
+
+function showOTPScreen() {
+  document.getElementById('register').classList.add('hidden');
+  const otpScreen = document.getElementById('otpScreen');
+  otpScreen.classList.remove('hidden');
+
+  const container = document.getElementById('otpInputs');
+  container.innerHTML = '';
+  for(let i = 0; i < 6; i++) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 1;
+    input.addEventListener('input', () => {
+      if(input.value && i < 5) input.nextElementSibling.focus();
+    });
+    container.appendChild(input);
+  }
+}
+
+async function verifyOTP() {
+  const inputs = document.querySelectorAll('#otpInputs input');
+  let enteredOtp = '';
+  inputs.forEach(inp => enteredOtp += inp.value);
+
+  if (enteredOtp.length !== 6) {
+    alert("৬ ডিজিটের কোড দিন");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/verify`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phone: currentPhone, enteredOtp})
+    });
+    const data = await res.json();
+
+    alert(data.message);
+  } catch(e) {
+    alert("Something went wrong");
+  }
+}
+
+function backToRegister() {
+  document.getElementById('otpScreen').classList.add('hidden');
+  document.getElementById('register').classList.remove('hidden');
+}
+
+// Temporary Login (পরে পুরোপুরি করা যাবে)
+function loginUser() {
+  alert("Login ফিচার পরে সম্পূর্ণ করা হবে");
+}
+
+function logout() {
+  currentUser = null;
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('auth').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
